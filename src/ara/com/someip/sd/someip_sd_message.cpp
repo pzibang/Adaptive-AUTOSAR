@@ -1,4 +1,6 @@
 #include "./someip_sd_message.h"
+#include "../../entry/entry_deserializer.h"
+#include "../../option/option_deserializer.h"
 
 namespace ara
 {
@@ -18,6 +20,21 @@ namespace ara
                 {
                 }
 
+                SomeIpSdMessage::SomeIpSdMessage(SomeIpSdMessage &&other) : SomeIpMessage{std::move(other)},
+                                                                            mRebooted{other.mRebooted},
+                                                                            mEntries{std::move(other.mEntries)}
+                {
+                }
+
+                SomeIpSdMessage &SomeIpSdMessage::operator=(SomeIpSdMessage &&other)
+                {
+                    SomeIpMessage::operator=(std::move(other));
+                    mRebooted = other.mRebooted;
+                    mEntries = std::move(other.mEntries);
+
+                    return *this;
+                }
+
                 uint32_t SomeIpSdMessage::getEntriesLength() const noexcept
                 {
                     const uint32_t cEntrySize = 16;
@@ -32,14 +49,14 @@ namespace ara
                     const uint32_t cOptionLengthFieldSize = 3;
                     uint32_t _result = 0;
 
-                    for (auto entry : mEntries)
+                    for (auto &entry : mEntries)
                     {
-                        for (auto firstOption : entry->FirstOptions())
+                        for (auto &firstOption : entry->FirstOptions())
                         {
                             _result += cOptionLengthFieldSize + firstOption->Length();
                         }
 
-                        for (auto secondOption : entry->SecondOptions())
+                        for (auto &secondOption : entry->SecondOptions())
                         {
                             _result += cOptionLengthFieldSize + secondOption->Length();
                         }
@@ -48,14 +65,14 @@ namespace ara
                     return _result;
                 }
 
-                const std::vector<entry::Entry *> &SomeIpSdMessage::Entries() const noexcept
+                const std::vector<std::unique_ptr<entry::Entry>> &SomeIpSdMessage::Entries() const noexcept
                 {
                     return mEntries;
                 }
 
-                void SomeIpSdMessage::AddEntry(entry::Entry *entry)
+                void SomeIpSdMessage::AddEntry(std::unique_ptr<entry::Entry> entry)
                 {
-                    mEntries.push_back(entry);
+                    mEntries.push_back(std::move(entry));
                 }
 
                 uint32_t SomeIpSdMessage::Length() const noexcept
@@ -104,27 +121,25 @@ namespace ara
 
                     if (mRebooted)
                     {
-                        // Both Unicast Support and Explicit Initial Data Control flags are on.
-                        const uint32_t cRebootedFlag = 0xe0000000;
+                        // Unicast Support flag is on.
                         helper::Inject(_result, cRebootedFlag);
                     }
                     else
                     {
-                        // Both Unicast Support and Explicit Initial Data Control flags are on.
-                        const uint32_t cNotRebootedFlag = 0x60000000;
+                        // Unicast Support flag is on.
                         helper::Inject(_result, cNotRebootedFlag);
                     }
 
                     uint8_t _lastOptionIndex = 0;
                     std::vector<uint8_t> _entriesPayload;
                     std::vector<uint8_t> _optionsPayload;
-                    for (auto entry : mEntries)
+                    for (auto &entry : mEntries)
                     {
                         auto _entryPayload = entry->Payload(_lastOptionIndex);
                         helper::Concat(
                             _entriesPayload, std::move(_entryPayload));
 
-                        for (auto firstOption : entry->FirstOptions())
+                        for (auto &firstOption : entry->FirstOptions())
                         {
                             auto _firstOptionPayload = firstOption->Payload();
                             helper::Concat(
@@ -132,7 +147,7 @@ namespace ara
                             ++_lastOptionIndex;
                         }
 
-                        for (auto secondOption : entry->SecondOptions())
+                        for (auto &secondOption : entry->SecondOptions())
                         {
                             auto _secondOptionPayload = secondOption->Payload();
                             helper::Concat(
@@ -150,6 +165,74 @@ namespace ara
                     uint32_t _optionsLength = getOptionsLength();
                     helper::Inject(_result, _optionsLength);
                     helper::Concat(_result, std::move(_optionsPayload));
+
+                    return _result;
+                }
+
+                SomeIpSdMessage SomeIpSdMessage::Deserialize(
+                    const std::vector<uint8_t> &payload)
+                {
+                    SomeIpSdMessage _result;
+                    SomeIpMessage::Deserialize(&_result, payload);
+
+                    const std::size_t cSomeIpSdPduOffset = 16;
+                    std::size_t _entryOffset = cSomeIpSdPduOffset;
+                    uint32_t _rebootFlag =
+                        helper::ExtractInteger(payload, _entryOffset);
+                    if (_rebootFlag == cRebootedFlag)
+                    {
+                        _result.mRebooted = true;
+                    }
+                    else if (_rebootFlag == cNotRebootedFlag)
+                    {
+                        _result.mRebooted = false;
+                    }
+                    else
+                    {
+                        throw std::out_of_range(
+                            "The serialized reboot flag is out of range.");
+                    }
+
+                    uint32_t _entriesLength =
+                        helper::ExtractInteger(payload, _entryOffset);
+                    uint32_t _entryOffsetMax = _entryOffset + _entriesLength;
+
+                    const std::size_t cOptionsLengthFieldSize = 4;
+                    std::size_t _optionOffset =
+                        _entryOffset + _entriesLength + cOptionsLengthFieldSize;
+
+                    while (_entryOffset < _entryOffsetMax)
+                    {
+                        uint8_t _numberOfFirstOptions;
+                        uint8_t _numberOfSecondOptions;
+
+                        auto _entry{
+                            entry::EntryDeserializer::Deserialize(
+                                payload,
+                                _entryOffset,
+                                _numberOfFirstOptions,
+                                _numberOfSecondOptions)};
+
+                        for (int i = 0; i < _numberOfFirstOptions; i++)
+                        {
+                            auto _option{
+                                option::OptionDeserializer::Deserialize(
+                                    payload, _optionOffset)};
+
+                            _entry->AddFirstOption(std::move(_option));
+                        }
+
+                        for (int i = 0; i < _numberOfSecondOptions; i++)
+                        {
+                            auto _option{
+                                option::OptionDeserializer::Deserialize(
+                                    payload, _optionOffset)};
+
+                            _entry->AddSecondOption(std::move(_option));
+                        }
+
+                        _result.AddEntry(std::move(_entry));
+                    }
 
                     return _result;
                 }

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <array>
-#include "../../../../src/ara/com/option/ipv4_endpoint_option.h"
+#include "../../../../src/ara/com/option/option_deserializer.h"
 
 namespace ara
 {
@@ -21,11 +21,11 @@ namespace ara
                     Ipv4EndpointOption::CreateUnitcastEndpoint(
                         cDiscardable, cIpAddress, cProtocol, cPort);
 
-                EXPECT_EQ(_option.Discardable(), cDiscardable);
-                EXPECT_EQ(_option.IpAddress(), cIpAddress);
-                EXPECT_EQ(_option.L4Proto(), cProtocol);
-                EXPECT_EQ(_option.Port(), cPort);
-                EXPECT_EQ(_option.Type(), cType);
+                EXPECT_EQ(_option->Discardable(), cDiscardable);
+                EXPECT_EQ(_option->IpAddress(), cIpAddress);
+                EXPECT_EQ(_option->L4Proto(), cProtocol);
+                EXPECT_EQ(_option->Port(), cPort);
+                EXPECT_EQ(_option->Type(), cType);
             }
 
             TEST(Ipv4EndpointOptionTest, MulticastFactory)
@@ -54,7 +54,7 @@ namespace ara
                      0xc0, 0xa8, 0x01, 0xfe,
                      0x00, 0x11, 0x77, 0x1a};
 
-                auto _actualPayload = _option.Payload();
+                auto _actualPayload = _option->Payload();
 
                 bool _areEqual =
                     std::equal(
@@ -63,6 +63,48 @@ namespace ara
                         cExpectedPayload.begin());
 
                 EXPECT_TRUE(_areEqual);
+            }
+
+            TEST(Ipv4EndpointOptionTest, Deserializing)
+            {
+                const bool cDiscardable = true;
+                const helper::Ipv4Address cIpAddress(127, 0, 0, 1);
+                const Layer4ProtocolType cProtocol = Layer4ProtocolType::Tcp;
+                const uint16_t cPort = 8080;
+                const OptionType cType = OptionType::IPv4Endpoint;
+
+                auto _originalOption =
+                    Ipv4EndpointOption::CreateUnitcastEndpoint(
+                        cDiscardable, cIpAddress, cProtocol, cPort);
+
+                auto _payload = _originalOption->Payload();
+                std::size_t _offset = 0;
+                auto _deserializedOptionBase =
+                    OptionDeserializer::Deserialize(_payload, _offset);
+
+                auto _deserializedOption =
+                    dynamic_cast<Ipv4EndpointOption *>(
+                        _deserializedOptionBase.get());
+
+                EXPECT_EQ(
+                    _originalOption->Type(),
+                    _deserializedOption->Type());
+
+                EXPECT_EQ(
+                    _originalOption->Discardable(),
+                    _deserializedOption->Discardable());
+
+                EXPECT_EQ(
+                    _originalOption->IpAddress(),
+                    _deserializedOption->IpAddress());
+
+                EXPECT_EQ(
+                    _originalOption->L4Proto(),
+                    _deserializedOption->L4Proto());
+
+                EXPECT_EQ(
+                    _originalOption->Port(),
+                    _deserializedOption->Port());
             }
         }
     }

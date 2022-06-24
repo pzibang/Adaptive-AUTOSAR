@@ -44,23 +44,24 @@ namespace ara
                 return _result;
             }
 
-            Ipv4EndpointOption Ipv4EndpointOption::CreateUnitcastEndpoint(
+            std::unique_ptr<Ipv4EndpointOption> Ipv4EndpointOption::CreateUnitcastEndpoint(
                 bool discardable,
                 helper::Ipv4Address ipAddress,
                 Layer4ProtocolType protocol,
                 uint16_t port) noexcept
             {
-                Ipv4EndpointOption _result(
-                    OptionType::IPv4Endpoint,
-                    discardable,
-                    ipAddress,
-                    protocol,
-                    port);
+                std::unique_ptr<Ipv4EndpointOption> _result(
+                    new Ipv4EndpointOption(
+                        OptionType::IPv4Endpoint,
+                        discardable,
+                        ipAddress,
+                        protocol,
+                        port));
 
                 return _result;
             }
 
-            Ipv4EndpointOption Ipv4EndpointOption::CreateMulticastEndpoint(
+            std::unique_ptr<Ipv4EndpointOption> Ipv4EndpointOption::CreateMulticastEndpoint(
                 bool discardable,
                 helper::Ipv4Address ipAddress,
                 uint16_t port)
@@ -75,30 +76,68 @@ namespace ara
                     throw std::invalid_argument("IP address is out of range.");
                 }
 
-                Ipv4EndpointOption _result(
-                    OptionType::IPv4Multicast,
-                    discardable,
-                    ipAddress,
-                    Layer4ProtocolType::Udp,
-                    port);
+                std::unique_ptr<Ipv4EndpointOption> _result(
+                    new Ipv4EndpointOption(
+                        OptionType::IPv4Multicast,
+                        discardable,
+                        ipAddress,
+                        Layer4ProtocolType::Udp,
+                        port));
 
                 return _result;
             }
 
-            Ipv4EndpointOption Ipv4EndpointOption::CreateSdEndpoint(
+            std::unique_ptr<Ipv4EndpointOption> Ipv4EndpointOption::CreateSdEndpoint(
                 bool discardable,
                 helper::Ipv4Address ipAddress,
                 Layer4ProtocolType protocol,
                 uint16_t port) noexcept
             {
-                Ipv4EndpointOption _result(
-                    OptionType::IPv4SdEndpoint,
-                    discardable,
-                    ipAddress,
-                    protocol,
-                    port);
+                std::unique_ptr<Ipv4EndpointOption> _result(
+                    new Ipv4EndpointOption(OptionType::IPv4SdEndpoint,
+                                           discardable,
+                                           ipAddress,
+                                           protocol,
+                                           port));
 
                 return _result;
+            }
+
+            std::unique_ptr<Ipv4EndpointOption> Ipv4EndpointOption::Deserialize(
+                const std::vector<uint8_t> &payload,
+                std::size_t &offset,
+                OptionType type,
+                bool discardable)
+            {
+                helper::Ipv4Address _ipAddress =
+                    helper::Ipv4Address::Extract(payload, offset);
+
+                // Apply the reserved byte length field offset
+                offset++;
+
+                auto _protocol =
+                    static_cast<Layer4ProtocolType>(payload.at(offset++));
+
+                uint16_t _port = helper::ExtractShort(payload, offset);
+
+                switch (type)
+                {
+                case OptionType::IPv4Endpoint:
+                    return CreateUnitcastEndpoint(
+                        discardable, _ipAddress, _protocol, _port);
+
+                case OptionType::IPv4Multicast:
+                    return CreateMulticastEndpoint(
+                        discardable, _ipAddress, _port);
+
+                case OptionType::IPv4SdEndpoint:
+                    return CreateSdEndpoint(
+                        discardable, _ipAddress, _protocol, _port);
+
+                default:
+                    throw std::out_of_range(
+                        "The option type does not belong to IPv4 endpoint option series.");
+                }
             }
         }
     }

@@ -18,6 +18,29 @@ namespace ara
             {
             }
 
+            Entry::Entry(Entry &&other) : mType{other.mType},
+                                          mFirstOptions{std::move(other.mFirstOptions)},
+                                          mSecondOptions{std::move(other.mSecondOptions)},
+                                          mServiceId{other.mServiceId},
+                                          mInstanceId{other.mInstanceId},
+                                          mTTL{other.mTTL},
+                                          mMajorVersion{other.mMajorVersion}
+            {
+            }
+
+            Entry &Entry::operator=(Entry &&other)
+            {
+                mType = other.mType;
+                mFirstOptions = std::move(other.mFirstOptions);
+                mSecondOptions = std::move(other.mSecondOptions);
+                mServiceId = other.mServiceId;
+                mInstanceId = other.mInstanceId;
+                mTTL = other.mTTL;
+                mMajorVersion = other.mMajorVersion;
+
+                return *this;
+            }
+
             bool Entry::ValidateOption(const option::Option *option) const noexcept
             {
                 bool _result;
@@ -66,7 +89,7 @@ namespace ara
 
             bool Entry::ContainsOption(option::OptionType optionType) const noexcept
             {
-                for (auto firstOption : mFirstOptions)
+                for (auto &firstOption : mFirstOptions)
                 {
                     if (firstOption->Type() == optionType)
                     {
@@ -74,7 +97,7 @@ namespace ara
                     }
                 }
 
-                for (auto secondOption : mSecondOptions)
+                for (auto &secondOption : mSecondOptions)
                 {
                     if (secondOption->Type() == optionType)
                     {
@@ -110,18 +133,18 @@ namespace ara
                 return mTTL;
             }
 
-            const std::vector<option::Option *> &Entry::FirstOptions() const noexcept
+            const std::vector<std::unique_ptr<option::Option>> &Entry::FirstOptions() const noexcept
             {
                 return mFirstOptions;
             }
 
-            void Entry::AddFirstOption(option::Option *firstOption)
+            void Entry::AddFirstOption(std::unique_ptr<option::Option> firstOption)
             {
-                bool _valid = ValidateOption(firstOption);
+                bool _valid = ValidateOption(firstOption.get());
 
                 if (_valid)
                 {
-                    mFirstOptions.push_back(firstOption);
+                    mFirstOptions.push_back(std::move(firstOption));
                 }
                 else
                 {
@@ -129,18 +152,18 @@ namespace ara
                 }
             }
 
-            const std::vector<option::Option *> &Entry::SecondOptions() const noexcept
+            const std::vector<std::unique_ptr<option::Option>> &Entry::SecondOptions() const noexcept
             {
                 return mSecondOptions;
             }
 
-            void Entry::AddSecondOption(option::Option *secondOption)
+            void Entry::AddSecondOption(std::unique_ptr<option::Option> secondOption)
             {
-                bool _valid = ValidateOption(secondOption);
+                bool _valid = ValidateOption(secondOption.get());
 
                 if (_valid)
                 {
-                    mSecondOptions.push_back(secondOption);
+                    mSecondOptions.push_back(std::move(secondOption));
                 }
                 else
                 {
@@ -163,7 +186,6 @@ namespace ara
                 uint8_t _secondOptionsSize = SecondOptions().size();
                 optionIndex += _secondOptionsSize;
 
-                const uint8_t cOptionSizeBitLength = 4;
                 _firstOptionsSize <<= cOptionSizeBitLength;
                 _firstOptionsSize |= _secondOptionsSize;
                 _result.push_back(_firstOptionsSize);

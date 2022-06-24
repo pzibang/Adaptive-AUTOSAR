@@ -16,6 +16,19 @@ namespace ara
             {
             }
 
+            ServiceEntry::ServiceEntry(ServiceEntry &&other) : Entry{std::move(other)},
+                                                               mMinorVersion{other.mMinorVersion}
+            {
+            }
+
+            ServiceEntry &ServiceEntry::operator=(ServiceEntry &&other)
+            {
+                Entry::operator=(std::move(other));
+                mMinorVersion = other.mMinorVersion;
+
+                return *this;
+            }
+
             bool ServiceEntry::ValidateOption(
                 const option::Option *option) const noexcept
             {
@@ -42,7 +55,7 @@ namespace ara
                 return _result;
             }
 
-            ServiceEntry ServiceEntry::CreateFindServiceEntry(
+            std::unique_ptr<ServiceEntry> ServiceEntry::CreateFindServiceEntry(
                 uint16_t serviceId,
                 uint32_t ttl,
                 uint16_t instanceId,
@@ -56,38 +69,45 @@ namespace ara
                     throw std::invalid_argument("TTL cannot be zero.");
                 }
 
-                ServiceEntry _result(
-                    cFindServiceEntry,
-                    serviceId,
-                    instanceId,
-                    ttl,
-                    majorVersion,
-                    minorVersion);
+                std::unique_ptr<ServiceEntry> _result(
+                    new ServiceEntry(
+                        cFindServiceEntry,
+                        serviceId,
+                        instanceId,
+                        ttl,
+                        majorVersion,
+                        minorVersion));
 
                 return _result;
             }
 
-            ServiceEntry ServiceEntry::CreateOfferServiceEntry(
+            std::unique_ptr<ServiceEntry> ServiceEntry::CreateOfferServiceEntry(
                 uint16_t serviceId,
                 uint16_t instanceId,
                 uint8_t majorVersion,
-                uint32_t minorVersion) noexcept
+                uint32_t minorVersion,
+                uint32_t ttl)
             {
                 const EntryType cOfferServiceEntry = EntryType::Offering;
-                const uint32_t cOfferServiceTTL = 0xffffff;
 
-                ServiceEntry _result(
-                    cOfferServiceEntry,
-                    serviceId,
-                    instanceId,
-                    cOfferServiceTTL,
-                    majorVersion,
-                    minorVersion);
+                if (ttl == 0)
+                {
+                    throw std::invalid_argument("TTL cannot be zero.");
+                }
+
+                std::unique_ptr<ServiceEntry> _result(
+                    new ServiceEntry(
+                        cOfferServiceEntry,
+                        serviceId,
+                        instanceId,
+                        ttl,
+                        majorVersion,
+                        minorVersion));
 
                 return _result;
             }
 
-            ServiceEntry ServiceEntry::CreateStopOfferEntry(
+            std::unique_ptr<ServiceEntry> ServiceEntry::CreateStopOfferEntry(
                 uint16_t serviceId,
                 uint16_t instanceId,
                 uint8_t majorVersion,
@@ -96,15 +116,53 @@ namespace ara
                 const EntryType cOfferServiceEntry = EntryType::Offering;
                 const uint32_t cStopOfferTTL = 0x000000;
 
-                ServiceEntry _result(
-                    cOfferServiceEntry,
-                    serviceId,
-                    instanceId,
-                    cStopOfferTTL,
-                    majorVersion,
-                    minorVersion);
+                std::unique_ptr<ServiceEntry> _result(
+                    new ServiceEntry(
+                        cOfferServiceEntry,
+                        serviceId,
+                        instanceId,
+                        cStopOfferTTL,
+                        majorVersion,
+                        minorVersion));
 
                 return _result;
+            }
+
+            std::unique_ptr<ServiceEntry> ServiceEntry::Deserialize(
+                const std::vector<uint8_t> &payload,
+                std::size_t &offset,
+                EntryType type,
+                uint16_t serviceId,
+                uint16_t instanceId,
+                uint32_t ttl,
+                uint8_t majorVersion)
+            {
+                uint32_t _minorVersion = helper::ExtractInteger(payload, offset);
+
+                switch (type)
+                {
+                case EntryType::Finding:
+                    return CreateFindServiceEntry(
+                        serviceId, ttl, instanceId, majorVersion, _minorVersion);
+
+                case EntryType::Offering:
+                {
+                    if (ttl > 0)
+                    {
+                        return CreateOfferServiceEntry(
+                            serviceId, instanceId, majorVersion, _minorVersion, ttl);
+                    }
+                    else
+                    {
+                        return CreateStopOfferEntry(
+                            serviceId, instanceId, majorVersion, _minorVersion);
+                    }
+                }
+
+                default:
+                    throw std::out_of_range(
+                        "The entry type does not belong to service entry series.");
+                }
             }
         }
     }

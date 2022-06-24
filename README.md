@@ -1,7 +1,7 @@
 # Adaptive-AUTOSAR
 ![example workflow](https://github.com/langroodi/Adaptive-AUTOSAR/actions/workflows/cmake.yml/badge.svg)
 
-Adaptive AUTOSAR is a simulated _Adaptive Platform_ enviroment over Linux defined by [AUTOSAR](https://www.autosar.org/standards/adaptive-platform/). The goal of this project is to implement the interfaces defined by the standard for educational purposes.
+Adaptive AUTOSAR is a simulated _Adaptive Platform_ enviroment over Linux defined by [AUTOSAR](https://www.autosar.org/standards/adaptive-platform/). The goal of this project is to implement the interfaces defined by the standard for educational purposes. For more information, please refer to [the project Wiki](https://github.com/langroodi/Adaptive-AUTOSAR/wiki).
 
 ## Dependecies
 
@@ -9,17 +9,41 @@ It will be tried to use minimum number of dependencies as much as possible. The 
 
 - Cpp Standard: 14
 - Cmake mimimum version: 3.14
-- Clang C++ Compiler: 10.0.0
+- Compiler:
+    - GCC C/C++ Compiler (x86-64 Linux GNU): 9.3.0; or
+    - Clang C/C++ Compiler (x86-64 PC Linux GNU): 10.0.0
 - Google Test: v1.11.0
+- [Async BSD Socket Lib](https://github.com/langroodi/Async-BSD-Socket-Lib) (in-house C++ libary)
+- [OBD-II Emulator](https://github.com/langroodi/OBD-II-Emulator) (in-house C++ emulator)
 
-## Project Milestones
 
-- [x] CI workflow
-- [x] Doxygen documentation
-- [ ] Hardware integration (i.e., CAN-bus and LIN-bus)
-- [ ] OBD-II and DoIP
-- [ ] Replace STL with ARA Core types (e.g.,`std::future` to `ara::core::Future`)
-- [ ] MISRA certified
-- [ ] Dedicated memory allocator
-- [ ] Integration with Volvo [Extended Vehicle](https://developer.volvocars.com/volvo-api/extended-vehicle/) and [Connected Vehicle](https://developer.volvocars.com/volvo-api/connected-vehicle/) APIs
-- [ ] E2E communication protection
+## Build
+
+### Compiler debug configuration
+
+- GCC:
+```bash
+cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_C_COMPILER:FILEPATH=/usr/bin/x86_64-linux-gnu-gcc-9 -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/x86_64-linux-gnu-g++-9 -S . -B build
+```
+- Clang:
+```bash
+cmake -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_C_COMPILER:FILEPATH=/usr/bin/clang-10 -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/clang++-10 -S . -B build
+```
+
+### Compiling
+```bash
+cmake --build build
+```
+
+### Unit tests running
+```bash
+cd build && ctest
+```
+
+## Documentation
+
+Please refer to [the project GitHub pages](https://langroodi.github.io/Adaptive-AUTOSAR/) powered by Doxygen.
+
+## Contribution
+
+Please refer to [the contributing page](https://github.com/langroodi/Adaptive-AUTOSAR/blob/master/CONTRIBUTING.md).

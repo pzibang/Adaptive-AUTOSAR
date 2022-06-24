@@ -38,6 +38,32 @@ namespace ara
             {
                 vector1.insert(vector1.end(), vector2.begin(), vector2.end());
             }
+
+            uint16_t ExtractShort(
+                const std::vector<uint8_t> &vector, std::size_t &offset)
+            {
+                uint16_t _result = vector.at(offset) << 8;
+                ++offset;
+                _result |= vector.at(offset);
+                ++offset;
+
+                return _result;
+            }
+
+            uint32_t ExtractInteger(
+                const std::vector<uint8_t> &vector, std::size_t &offset)
+            {
+                uint32_t _result = vector.at(offset) << 24;
+                ++offset;
+                _result |= vector.at(offset) << 16;
+                ++offset;
+                _result |= vector.at(offset) << 8;
+                ++offset;
+                _result |= vector.at(offset);
+                ++offset;
+
+                return _result;
+            }
         }
     }
 }
